@@ -52,6 +52,11 @@ class CFUC(BusABC):
             channel, baudrate=baudrate, timeout=timeout, rtscts=rtscts)
 
         self.can_frame_count = 0
+
+        self.ser.reset_input_buffer()
+        self.ser.reset_output_buffer()
+
+
         super(CFUC, self).__init__(channel=channel, *args, **kwargs)            
 
     def shutdown(self):
@@ -151,13 +156,14 @@ class CFUC(BusABC):
             # ser.read can return an empty string
             # or raise a SerialException  
             try:
-                rx_byte = self.ser.read()
+                rx_byte = self.ser.read(4)
+                rx_byte = (struct.unpack('<I', rx_byte))[0]
             except serial.SerialException:
                 return None, False
-            if rx_byte == 6:#UCAN_FD_RX:
+            if rx_byte == 0x06:#UCAN_FD_RX:
                 s = bytearray(self.ser.read(4))
                 self.can_frame_count = (struct.unpack('<I', s))[0]
-        else :
+            # else   
             if (self.can_frame_count > 0) & (self.can_frame_count < 10):
                 self.can_frame_count = self.can_frame_count - 1
                 s = bytearray(self.ser.read(4)) 
@@ -165,7 +171,7 @@ class CFUC(BusABC):
                 s = bytearray(self.ser.read(8)) #IdType #RxFrameType 
                 s = bytearray(self.ser.read(4)) #DataLength
                 len = (struct.unpack('<I', s))[0]
-                dlc = ADLC.get(len)
+                dlc = (list(ADLC.values()).index(len))
                 s = bytearray(self.ser.read(4)) #ErrorStateIndicator
                 s = bytearray(self.ser.read(4)) #BitRateSwitch
                 s = bytearray(self.ser.read(4)) #FDFormat
