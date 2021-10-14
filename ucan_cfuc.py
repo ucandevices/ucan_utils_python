@@ -42,20 +42,90 @@ ADLC = {
 
 class CFUC(BusABC):
     can_frame_count = 0
-    def __init__(self, channel, baudrate=115200, timeout=0.1, rtscts=False,
+
+    def append_int32(self,dest,source):
+        for i in range(0, 4):
+            dest.append(source[i])
+        return dest
+
+    def consturct_init_frame(self, IsFD = False, IsBRS = False, IsAutoRetransmission = False, 
+        NominalPrescalerValue = 1, NominalSyncJumpWidthValue = 1, NominalTimeSeg1Value = 13, NominalTimeSeg2Value = 2, 
+        DataPrescalerValue = 1, DataSyncJumpWidthValue = 1, DataTimeSeg1Value = 1, DataTimeSeg2Value = 1):
+
+        byte_msg = bytearray()
+
+        UCAN_FD_INIT = struct.pack('<I', int(0x0))
+        ClockDivider =  struct.pack('<I', int(0x0))
+        if (IsFD):
+            if (IsBRS):
+                FrameFormat =  struct.pack('<I', int(0x00000300)) #fd + brs
+            else:
+                FrameFormat =  struct.pack('<I', int(0x00000200)) #fd 
+        else:
+            FrameFormat =  struct.pack('<I', int(0x00000000)) #clasic  
+
+        if (IsAutoRetransmission == False): 
+            AutoRetransmission = struct.pack('<I', int(0x00000000)) 
+        else: 
+            AutoRetransmission = struct.pack('<I', int(0x00000001))
+    
+        TransmitPause = struct.pack('<I', int(0x00000000)) 
+        ProtocolException = struct.pack('<I', int(0x00000000)) 
+
+        NominalPrescaler = struct.pack('<I', NominalPrescalerValue) 
+        NominalSyncJumpWidth = struct.pack('<I', NominalSyncJumpWidthValue)
+        NominalTimeSeg1 = struct.pack('<I', NominalTimeSeg1Value)
+        NominalTimeSeg2 = struct.pack('<I', NominalTimeSeg2Value)
+        DataPrescaler = struct.pack('<I', DataPrescalerValue)
+        DataSyncJumpWidth = struct.pack('<I', DataSyncJumpWidthValue)
+        DataTimeSeg1 = struct.pack('<I', DataTimeSeg1Value)
+        DataTimeSeg2 = struct.pack('<I', DataTimeSeg2Value)
+
+        StdFiltersNbr = struct.pack('<I', int(0x00000000))
+        ExtFiltersNbr = struct.pack('<I', int(0x00000000))
+        TxFifoQueueMode = struct.pack('<I', int(0x00000000))
+
+        byte_msg = self.append_int32(byte_msg,UCAN_FD_INIT)
+        byte_msg = self.append_int32(byte_msg,ClockDivider)
+        byte_msg = self.append_int32(byte_msg,FrameFormat)
+        byte_msg = self.append_int32(byte_msg,AutoRetransmission)
+        byte_msg = self.append_int32(byte_msg,TransmitPause)
+        byte_msg = self.append_int32(byte_msg,ProtocolException)
+        byte_msg = self.append_int32(byte_msg,NominalPrescaler)
+        byte_msg = self.append_int32(byte_msg,NominalSyncJumpWidth)
+        byte_msg = self.append_int32(byte_msg,NominalTimeSeg1)
+        byte_msg = self.append_int32(byte_msg,NominalTimeSeg2)
+        byte_msg = self.append_int32(byte_msg,DataPrescaler)
+        byte_msg = self.append_int32(byte_msg,DataSyncJumpWidth)
+        byte_msg = self.append_int32(byte_msg,DataTimeSeg1)
+        byte_msg = self.append_int32(byte_msg,DataTimeSeg2)
+        byte_msg = self.append_int32(byte_msg,StdFiltersNbr)
+        byte_msg = self.append_int32(byte_msg,ExtFiltersNbr)
+        byte_msg = self.append_int32(byte_msg,TxFifoQueueMode)
+
+        return byte_msg
+
+    def __init__(self, channel, IsFD = False, IsBRS = False, IsAutoRetransmission = False, 
+        NominalPrescalerValue = 1, NominalSyncJumpWidthValue = 1, NominalTimeSeg1Value = 13, NominalTimeSeg2Value = 2, 
+        DataPrescalerValue = 1, DataSyncJumpWidthValue = 1, DataTimeSeg1Value = 1, DataTimeSeg2Value = 1,
                  *args, **kwargs):
         if not channel:
             raise ValueError("Must specify a serial port.")
 
         self.channel_info = "Serial interface: " + channel
         self.ser = serial.serial_for_url(
-            channel, baudrate=baudrate, timeout=timeout, rtscts=rtscts)
+            channel, baudrate=115200, timeout=0.1, rtscts=False)
 
         self.can_frame_count = 0
 
         self.ser.reset_input_buffer()
         self.ser.reset_output_buffer()
 
+        frame = self.consturct_init_frame(IsFD, IsBRS, IsAutoRetransmission, 
+        NominalPrescalerValue, NominalSyncJumpWidthValue, NominalTimeSeg1Value, NominalTimeSeg2Value, 
+        DataPrescalerValue, DataSyncJumpWidthValue, DataTimeSeg1Value, DataTimeSeg2Value)
+        
+        self.ser.write(frame)
 
         super(CFUC, self).__init__(channel=channel, *args, **kwargs)            
 
