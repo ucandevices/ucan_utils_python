@@ -1,8 +1,4 @@
-from _typeshed import HasFileno
-
-
-def inc(x):
-    return x + 1
+# from _typeshed import HasFileno
 
 
 INT_MAX = 2147483647
@@ -65,7 +61,7 @@ def can_update_spt(btc, spt_nominal, tseg, tseg1_ptr, tseg2_ptr, spt_error_ptr):
             tseg2_ptr = tseg2
         if (spt_error_ptr):
             spt_error_ptr = best_spt_error
-        return best_spt
+        return tseg1,tseg2,spt_error, best_spt
 
 
 
@@ -97,17 +93,17 @@ def CAN_CALC_BITTIMING(bt, btc):
     tseg = (btc.tseg1_max + btc.tseg2_max) * 2 + 1
     while tseg >= (btc.tseg1_min + btc.tseg2_min) * 2:
         tseg = tseg - 1
-        tsegall = CAN_CALC_SYNC_SEG + tseg / 2
+        tsegall = round(CAN_CALC_SYNC_SEG + tseg / 2)
 
         # Compute all possible tseg choices (tseg=tseg1+tseg2) 
-        brp = clock_freq / (tsegall * bt.bitrate) + tseg % 2
+        brp = round(clock_freq / (tsegall * bt.bitrate) + tseg % 2)
 
         # choose brp step which is possible in system */
         brp = (brp / btc.brp_inc) * btc.brp_inc
         if (brp < btc.brp_min) | (brp > btc.brp_max):
             continue
 
-        rate = clock_freq / (brp * tsegall)
+        rate = round(clock_freq / (brp * tsegall))
         rate_error = abs(bt.bitrate - rate)
 
         # tseg brp biterror 
@@ -117,7 +113,7 @@ def CAN_CALC_BITTIMING(bt, btc):
         if (rate_error < best_rate_error):
             best_spt_error = UINT_MAX
 
-        can_update_spt(btc, spt_nominal, tseg / 2, tseg1, tseg2, spt_error)
+        tseg1,tseg2,spt_error, spt = can_update_spt(btc, spt_nominal, tseg / 2, tseg1, tseg2, spt_error)
         if (spt_error > best_spt_error):
             continue
 
@@ -126,42 +122,42 @@ def CAN_CALC_BITTIMING(bt, btc):
         best_tseg = tseg / 2
         best_brp = brp
 
-        if (rate_error == 0 & spt_error == 0):
+        if ((rate_error == 0) & (spt_error == 0)):
             break
 
-    if (best_rate_error) :
+    if (best_rate_error != 0) :
         # Error in one-tenth of a percent */
         rate_error = (best_rate_error * 1000) / bt.bitrate
         if (rate_error > CAN_CALC_MAX_ERROR):
             return -33
 
-        bt.sample_point = can_update_spt(btc, spt_nominal, best_tseg,tseg1, tseg2, 0)
-        v64 = best_brp * 1000 * 1000 * 1000
-        #do_div(v64, clock_freq)
-        v64 = v64 / clock_freq
-        # eof do_div
+    bt.sample_point = can_update_spt(btc, spt_nominal, best_tseg,tseg1, tseg2, 0)[3]
+    v64 = best_brp * 1000 * 1000 * 1000
+    #do_div(v64, clock_freq)
+    v64 = v64 / clock_freq
+    # eof do_div
 
-        bt.tq = v64
-        bt.prop_seg = tseg1 / 2
-        bt.phase_seg1 = tseg1 - bt.prop_seg
-        bt.phase_seg2 = tseg2
+    bt.tq = v64
+    bt.prop_seg = tseg1 / 2
+    bt.phase_seg1 = tseg1 - bt.prop_seg
+    bt.phase_seg2 = tseg2
 
-        if (bt.sjw == 0 | btc.sjw_max == 0):
-            bt.sjw = 1
-        else:
-            # bt->sjw is at least 1 -> sanitize upper bound to sjw_max */
-            if (bt.sjw > btc.sjw_max):
-                bt.sjw = btc.sjw_max
+    if ((bt.sjw == 0) | (btc.sjw_max == 0)):
+        bt.sjw = 1
+    else:
+        # bt->sjw is at least 1 -> sanitize upper bound to sjw_max */
+        if (bt.sjw > btc.sjw_max):
+            bt.sjw = btc.sjw_max
         # bt->sjw must not be higher than tseg2 */
         if (tseg2 < bt.sjw):
             bt.sjw = tseg2
 
-        bt.brp = best_brp
+    bt.brp = best_brp
 
-        # real bit-rate */
-        bt.bitrate = clock_freq / (bt.brp * (CAN_CALC_SYNC_SEG + tseg1 + tseg2))
+    # real bit-rate */
+    bt.bitrate = clock_freq / (bt.brp * (CAN_CALC_SYNC_SEG + tseg1 + tseg2))
 
-        return 0
+    return bt
 
 
 
